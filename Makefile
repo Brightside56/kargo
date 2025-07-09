@@ -12,6 +12,8 @@ GO_LINT_EXTRA_FLAGS 	?= --output.text.print-issued-lines --output.text.colors
 
 GO_TEST_ARGS ?=
 
+GO_TEST_ARGS ?=
+
 VERSION_PACKAGE := github.com/akuity/kargo/pkg/x/version
 
 # Default to docker, but support alternative container runtimes that are CLI-compatible with Docker
