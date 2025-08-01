@@ -10,14 +10,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Drawer, Flex, Skeleton, Tabs, Typography } from 'antd';
 import Alert from 'antd/es/alert/Alert';
 import { useMemo } from 'react';
-import { generatePath, useNavigate, useParams } from 'react-router-dom';
+import { generatePath, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { paths } from '@ui/config/paths';
 import { AssembleFreight } from '@ui/features/assemble-freight/assemble-freight';
 import YamlEditor from '@ui/features/common/code-editor/yaml-editor-lazy';
 import { getWarehouse } from '@ui/gen/api/service/v1alpha1/service-KargoService_connectquery';
 import { RawFormat } from '@ui/gen/api/service/v1alpha1/service_pb';
-import { Warehouse } from '@ui/gen/api/v1alpha1/generated_pb';
+import { Freight, Warehouse } from '@ui/gen/api/v1alpha1/generated_pb';
 import { decodeRawData } from '@ui/utils/decode-raw-data';
 
 import { RepoSubscriptions } from './repo-subscriptions';
@@ -33,6 +33,10 @@ export const WarehouseDetails = ({
 }) => {
   const { name: projectName, warehouseName, tab } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get source freight from navigation state if provided
+  const sourceFreight = location.state?.sourceFreight as Freight | undefined;
 
   const onClose = () => navigate(generatePath(paths.project, { name: projectName }));
 
@@ -106,6 +110,7 @@ export const WarehouseDetails = ({
             >
               <AssembleFreight
                 warehouse={warehouse}
+                sourceFreight={sourceFreight}
                 onSuccess={() => {
                   onClose();
                   refetchFreight();

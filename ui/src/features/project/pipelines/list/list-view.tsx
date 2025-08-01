@@ -19,7 +19,6 @@ import { Filter, FilterContext } from './context/filter-context';
 
 type PipelineListViewProps = {
   stages: Stage[];
-  warehouses: Warehouse[];
   freights: Freight[];
   className?: string;
   project: string;

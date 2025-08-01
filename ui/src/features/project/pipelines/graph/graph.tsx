@@ -5,6 +5,7 @@ import { queryCache } from '@ui/features/utils/cache';
 import { Stage, Warehouse } from '@ui/gen/api/v1alpha1/generated_pb';
 
 import { useFreightTimelineControllerContext } from '../context/freight-timeline-controller-context';
+import { useWarehouses } from '../context/warehouse-context';
 import { GraphContext } from '../context/graph-context';
 import { StackedNodes } from '../nodes/stacked-nodes';
 
@@ -14,7 +15,6 @@ import { useEventsWatcher } from './use-events-watcher';
 import { reactFlowNodeConstants, useReactFlowPipelineGraph } from './use-pipeline-graph';
 
 type GraphProps = {
-  warehouses: Warehouse[];
   stages: Stage[];
   project: string;
 };
@@ -26,6 +26,7 @@ const nodeTypes = {
 
 export const Graph = (props: GraphProps) => {
   const filterContext = useFreightTimelineControllerContext();
+  const warehouses = useWarehouses();
 
   const stackedNodesParents = filterContext?.preferredFilter?.stackedNodesParents || [];
 
@@ -58,7 +59,7 @@ export const Graph = (props: GraphProps) => {
 
   const graph = useReactFlowPipelineGraph(
     props.stages,
-    props.warehouses,
+    warehouses,
     filterContext?.preferredFilter.warehouses || [],
     redraw,
     {
@@ -127,12 +128,12 @@ export const Graph = (props: GraphProps) => {
   const warehouseByName = useMemo(() => {
     const warehouseByName: Record<string, Warehouse> = {};
 
-    for (const warehouse of props.warehouses) {
+    for (const warehouse of warehouses) {
       warehouseByName[warehouse.metadata?.name || ''] = warehouse;
     }
 
     return warehouseByName;
-  }, [props.warehouses]);
+  }, [warehouses]);
 
   return (
     <GraphContext.Provider value={{ warehouseByName, stackedNodesParents, onStack, onUnstack }}>

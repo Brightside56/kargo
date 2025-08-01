@@ -6,10 +6,10 @@ import { useMemo } from 'react';
 import { Stage, Warehouse } from '@ui/gen/api/v1alpha1/generated_pb';
 
 import { useFreightTimelineControllerContext } from './context/freight-timeline-controller-context';
+import { useWarehouses } from './context/warehouse-context';
 import { groupNodes } from './group-nodes';
 
 type GraphFiltersProps = {
-  warehouses: Warehouse[];
   stages: Stage[];
   pipelineView: 'graph' | 'list';
   setPipelineView: (view: 'graph' | 'list') => void;
@@ -17,10 +17,11 @@ type GraphFiltersProps = {
 
 export const GraphFilters = (props: GraphFiltersProps) => {
   const filterContext = useFreightTimelineControllerContext();
+  const warehouses = useWarehouses();
 
   const stackedNodesParents = useMemo(
-    () => groupNodes(props.stages, props.warehouses).filter(Boolean),
-    [props.stages, props.warehouses]
+    () => groupNodes(props.stages, warehouses).filter(Boolean),
+    [props.stages, warehouses]
   );
 
   return (
@@ -35,7 +36,7 @@ export const GraphFilters = (props: GraphFiltersProps) => {
         maxTagCount={2}
         placeholder='All'
         value={filterContext?.preferredFilter?.warehouses || []}
-        options={props.warehouses.map((warehouse) => ({
+        options={warehouses.map((warehouse) => ({
           label: warehouse?.metadata?.name,
           value: warehouse?.metadata?.name
         }))}

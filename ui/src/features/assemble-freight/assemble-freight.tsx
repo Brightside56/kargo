@@ -29,7 +29,6 @@ import { ChartTable } from './chart-table';
 import { CommitTable } from './commit-table';
 import { ImageTable } from './image-table';
 import { DiscoveryResult, FreightInfo } from './types';
-import { getSubscriptionKey } from './unique-subscription-key';
 
 const constructFreight = (
   chosenItems: {
@@ -61,6 +60,8 @@ const constructFreight = (
         repoURL: artifact.repoURL,
         tag: imageRef.tag,
         digest: imageRef.digest,
+        // Deprecated: Use OCI annotations instead. Will be removed in version 1.7.
+        gitRepoURL: imageRef.gitRepoURL,
         annotations: imageRef.annotations
       } as Image);
     } else if ('versions' in artifact) {
@@ -88,9 +89,11 @@ const constructFreight = (
 
 export const AssembleFreight = ({
   warehouse,
+  sourceFreight,
   onSuccess
 }: {
   warehouse?: Warehouse;
+  sourceFreight?: Freight;
   onSuccess: () => void;
 }) => {
   const { name: project } = useParams();
@@ -147,29 +150,74 @@ export const AssembleFreight = ({
       }
     }
 
-    for (const image of images) {
-      init[getSubscriptionKey(image)] = {
-        artifact: image,
-        info: image.references[0]
-      };
-    }
+    // Pre-fill with source freight artifacts if provided
+    if (sourceFreight) {
+      // Pre-select image artifacts from source freight
+      sourceFreight.images?.forEach((image) => {
+        const matchingImage = images.find(img => img.repoURL === image.repoURL);
+        if (matchingImage) {
+          const matchingReference = matchingImage.references.find(ref => 
+            ref.tag === image.tag && ref.digest === image.digest
+          );
+          if (matchingReference) {
+            init[image.repoURL as string] = {
+              artifact: matchingImage,
+              info: matchingReference
+            };
+          }
+        }
+      });
 
-    for (const chart of charts) {
-      init[getSubscriptionKey(chart)] = {
-        artifact: chart,
-        info: chart.versions[0]
-      };
-    }
+      // Pre-select chart artifacts from source freight
+      sourceFreight.charts?.forEach((chart) => {
+        const matchingChart = charts.find(c => c.repoURL === chart.repoURL && c.name === chart.name);
+        if (matchingChart && matchingChart.versions.includes(chart.version)) {
+          init[chart.repoURL as string] = {
+            artifact: matchingChart,
+            info: chart.version
+          };
+        }
+      });
 
-    for (const commit of git) {
-      init[getSubscriptionKey(commit)] = {
-        artifact: commit,
-        info: commit.commits[0]
-      };
+      // Pre-select git commits from source freight
+      sourceFreight.commits?.forEach((commit) => {
+        const matchingGit = git.find(g => g.repoURL === commit.repoURL);
+        if (matchingGit) {
+          const matchingCommit = matchingGit.commits.find(c => c.id === commit.id);
+          if (matchingCommit) {
+            init[commit.repoURL as string] = {
+              artifact: matchingGit,
+              info: matchingCommit
+            };
+          }
+        }
+      });
+    } else {
+      // Default behavior when no source freight is provided
+      for (const image of images) {
+        init[image.repoURL as string] = {
+          artifact: image,
+          info: image.references[0]
+        };
+      }
+
+      for (const chart of charts) {
+        init[chart.repoURL as string] = {
+          artifact: chart,
+          info: chart.versions[0]
+        };
+      }
+
+      for (const commit of git) {
+        init[commit.repoURL as string] = {
+          artifact: commit,
+          info: commit.commits[0]
+        };
+      }
     }
 
     return [images, charts, git, init];
-  }, [warehouse]);
+  }, [warehouse, sourceFreight]);
 
   const [chosenItems, setChosenItems] = useState<{
     [key: string]: {
@@ -185,7 +233,7 @@ export const AssembleFreight = ({
     if (item) {
       setChosenItems({
         ...chosenItems,
-        [getSubscriptionKey(selected)]: {
+        [selected.repoURL as string]: {
           artifact: selected,
           info: item
         }
@@ -200,6 +248,15 @@ export const AssembleFreight = ({
 
   return (
     <div>
+      {sourceFreight && (
+        <div className='mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md'>
+          <div className='text-sm text-blue-800'>
+            <strong>Pre-filled from existing freight:</strong> Artifacts from freight{' '}
+            <code>{sourceFreight.alias || sourceFreight.metadata?.name}</code> have been pre-selected.
+            You can modify the selection before creating new freight.
+          </div>
+        </div>
+      )}
       <div className='text-xs font-medium text-gray-500 mb-2'>FREIGHT CONTENTS</div>
       <div className='mt-3 mb-5 flex items-center'>
         {Object.keys(chosenItems)?.length > 0 ? (
@@ -272,7 +329,7 @@ const DiscoveryTable = ({
     return null;
   }
 
-  const selectedItem = chosenItems[getSubscriptionKey(selected)]?.info;
+  const selectedItem = chosenItems[selected?.repoURL as string]?.info;
 
   return (
     <>

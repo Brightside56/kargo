@@ -6,6 +6,7 @@ import {
   faEllipsis,
   faTrash,
   faWarehouse,
+  faCopy,
   IconDefinition
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -19,6 +20,7 @@ import { paths } from '@ui/config/paths';
 import { useModal } from '@ui/features/common/modal/use-modal';
 import { useActionContext } from '@ui/features/project/pipelines/context/action-context';
 import { FreightTimelineControllerContextType } from '@ui/features/project/pipelines/context/freight-timeline-controller-context';
+import { useFreightAssembly } from '@ui/features/project/pipelines/use-freight-assembly';
 import { ColorMap } from '@ui/features/stage/utils';
 import { Freight, Stage } from '@ui/gen/api/v1alpha1/generated_pb';
 import { timestampDate } from '@ui/utils/connectrpc-utils';
@@ -44,10 +46,10 @@ type FreightCardProps = {
   // count of stacked freights
   count?: number;
 };
-
 export const FreightCard = (props: FreightCardProps) => {
   const navigate = useNavigate();
   const actionContext = useActionContext();
+  const { assembleFromFreight, canAssemble } = useFreightAssembly();
 
   const freightAlias = props.freight?.alias;
 
@@ -129,6 +131,16 @@ export const FreightCard = (props: FreightCardProps) => {
                       e.domEvent.stopPropagation();
                       actionContext?.actManuallyApprove(props.freight);
                     }
+                  },
+                  {
+                    key: 'create-freight-based-on',
+                    label: 'Create Freight Based On This',
+                    icon: <FontAwesomeIcon icon={faCopy} />,
+                    onClick: (e) => {
+                      e.domEvent.stopPropagation();
+                      assembleFromFreight(props.freight);
+                    },
+                    disabled: !canAssemble(props.freight)
                   },
                   {
                     key: 'delete-freight',
