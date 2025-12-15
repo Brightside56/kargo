@@ -97,6 +97,10 @@ fields:
     discovery window, it will remain available for Freight assembly as long as
     it's actively deployed. This prevents situations where a running version
     becomes unavailable for rollback or re-deployment.
+
+    Retained tags are cached in the Warehouse's status, minimizing Kubernetes
+    API queries. The cache is refreshed only when the Warehouse specification
+    changes or during the first discovery.
     :::
 
 - `insecureSkipTLSVerify`: Set to `true` to disable validation of the
