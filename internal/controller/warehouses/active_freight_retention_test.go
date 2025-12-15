@@ -41,13 +41,13 @@ func TestRetainActiveFreightTags(t *testing.T) {
 	require.NoError(t, kargoapi.AddToScheme(scheme))
 
 	testCases := []struct {
-		name              string
-		warehouse         *kargoapi.Warehouse
-		subscription      kargoapi.ImageSubscription
-		selector          image.Selector
-		discoveredImages  []kargoapi.DiscoveredImageReference
-		freightInCluster  []client.Object
-		assertions        func(*testing.T, []kargoapi.DiscoveredImageReference, error)
+		name             string
+		warehouse        *kargoapi.Warehouse
+		subscription     kargoapi.ImageSubscription
+		selector         image.Selector
+		discoveredImages []kargoapi.DiscoveredImageReference
+		freightInCluster []client.Object
+		assertions       func(*testing.T, []kargoapi.DiscoveredImageReference, error)
 	}{
 		{
 			name: "no active Freight",
@@ -131,7 +131,7 @@ func TestRetainActiveFreightTags(t *testing.T) {
 			assertions: func(t *testing.T, images []kargoapi.DiscoveredImageReference, err error) {
 				require.NoError(t, err)
 				require.Len(t, images, 3, "Should include 2 discovered + 1 retained active tag")
-				
+
 				// Check that the retained tag is present
 				tags := make([]string, len(images))
 				for i, img := range images {
@@ -244,7 +244,7 @@ func TestRetainActiveFreightTags(t *testing.T) {
 			assertions: func(t *testing.T, images []kargoapi.DiscoveredImageReference, err error) {
 				require.NoError(t, err)
 				require.Len(t, images, 3, "Should include 1 discovered + 2 retained active tags")
-				
+
 				tags := make([]string, len(images))
 				for i, img := range images {
 					tags[i] = img.Tag
@@ -401,7 +401,7 @@ func TestRetainActiveFreightTags(t *testing.T) {
 			assertions: func(t *testing.T, images []kargoapi.DiscoveredImageReference, err error) {
 				require.NoError(t, err)
 				require.Len(t, images, 2, "Should only retain tags matching selector")
-				
+
 				tags := make([]string, len(images))
 				for i, img := range images {
 					tags[i] = img.Tag

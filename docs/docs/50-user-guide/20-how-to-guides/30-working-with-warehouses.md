@@ -209,6 +209,16 @@ strategies are:
     require periodic adjustment as a repository grows.
     :::
 
+    :::info
+    To ensure continuity when using `NewestBuild`, Kargo automatically retains
+    image tags that are referenced by active Freight (Freight currently in use
+    by any Stage) during discovery. This means that even if an older tag falls
+    outside the discovery window (determined by `discoveryLimit`), it will
+    remain available for Freight assembly as long as it's actively deployed.
+    This prevents situations where a running version becomes unavailable for
+    rollback or re-deployment.
+    :::
+
     ```yaml
     spec:
       subscriptions:
