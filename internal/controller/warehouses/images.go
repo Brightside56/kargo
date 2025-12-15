@@ -109,10 +109,11 @@ func (r *reconciler) retainActiveFreightTags(
 // subscriptions. It returns a list of image discovery results, one for each
 // subscription.
 //
-// For subscriptions using the NewestBuild strategy, this function also includes
-// image tags referenced by "active" Freight (Freight currently in use by any Stage)
-// to ensure older tags that have fallen outside the discovery window remain
-// selectable.
+// This function includes image tags referenced by "active" Freight (Freight
+// currently in use by any Stage) to ensure older tags that have fallen outside
+// the discovery window remain selectable. This applies to all image selection
+// strategies to prevent situations where an actively deployed version becomes
+// unavailable for rollback or re-deployment.
 func (r *reconciler) discoverImages(
 	ctx context.Context,
 	warehouse *kargoapi.Warehouse,
@@ -165,18 +166,17 @@ func (r *reconciler) discoverImages(
 			)
 		}
 
-		// For NewestBuild strategy, augment the discovered images with tags from
-		// active Freight to ensure they remain selectable even if they fall outside
-		// the discovery window.
-		if sub.ImageSelectionStrategy == kargoapi.ImageSelectionStrategyNewestBuild {
-			images, err = r.retainActiveFreightTags(ctx, warehouse, sub, selector, images)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"error retaining active Freight tags for image %q: %w",
-					sub.RepoURL,
-					err,
-				)
-			}
+		// Augment the discovered images with tags from active Freight to ensure
+		// they remain selectable even if they fall outside the discovery window.
+		// This applies to all strategies to prevent situations where an actively
+		// deployed version becomes unavailable for rollback or re-deployment.
+		images, err = r.retainActiveFreightTags(ctx, warehouse, sub, selector, images)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"error retaining active Freight tags for image %q: %w",
+				sub.RepoURL,
+				err,
+			)
 		}
 
 		if len(images) == 0 {

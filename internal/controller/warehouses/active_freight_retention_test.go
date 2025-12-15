@@ -443,3 +443,95 @@ func TestRetainActiveFreightTags(t *testing.T) {
 		})
 	}
 }
+
+// TestRetainActiveFreightTagsAllStrategies verifies that active Freight tag
+// retention works for all image selection strategies, not just NewestBuild.
+func TestRetainActiveFreightTagsAllStrategies(t *testing.T) {
+scheme := runtime.NewScheme()
+require.NoError(t, kargoapi.AddToScheme(scheme))
+
+testStrategies := []kargoapi.ImageSelectionStrategy{
+kargoapi.ImageSelectionStrategyNewestBuild,
+kargoapi.ImageSelectionStrategySemVer,
+kargoapi.ImageSelectionStrategyLexical,
+kargoapi.ImageSelectionStrategyDigest,
+}
+
+for _, strategy := range testStrategies {
+t.Run(string(strategy), func(t *testing.T) {
+warehouse := &kargoapi.Warehouse{
+ObjectMeta: metav1.ObjectMeta{
+Name:      "test-warehouse",
+Namespace: "test-namespace",
+},
+}
+
+subscription := kargoapi.ImageSubscription{
+RepoURL:                "example.com/my-image",
+ImageSelectionStrategy: strategy,
+}
+
+selector := &fakeSelector{}
+
+discoveredImages := []kargoapi.DiscoveredImageReference{
+{Tag: "v1.0.0", Digest: "sha256:abc123"},
+}
+
+freightInCluster := []client.Object{
+// Active Freight with an older tag not in discovered images
+&kargoapi.Freight{
+ObjectMeta: metav1.ObjectMeta{
+Name:      "freight-active",
+Namespace: "test-namespace",
+},
+Origin: kargoapi.FreightOrigin{
+Kind: kargoapi.FreightOriginKindWarehouse,
+Name: "test-warehouse",
+},
+Images: []kargoapi.Image{
+{RepoURL: "example.com/my-image", Tag: "v0.9.0", Digest: "sha256:old123"},
+},
+Status: kargoapi.FreightStatus{
+CurrentlyIn: map[string]kargoapi.CurrentStage{
+"prod-stage": {Since: &metav1.Time{Time: metav1.Now().Time}},
+},
+},
+},
+}
+
+// Create fake client with the Freight objects
+fakeClient := fake.NewClientBuilder().
+WithScheme(scheme).
+WithObjects(freightInCluster...).
+WithIndex(
+&kargoapi.Freight{},
+indexer.FreightByWarehouseField,
+indexer.FreightByWarehouse,
+).
+Build()
+
+r := &reconciler{
+client:        fakeClient,
+credentialsDB: &credentials.FakeDB{},
+}
+
+images, err := r.retainActiveFreightTags(
+context.Background(),
+warehouse,
+subscription,
+selector,
+discoveredImages,
+)
+
+require.NoError(t, err)
+require.Len(t, images, 2, "Should retain active tag for strategy %s", strategy)
+
+tags := make([]string, len(images))
+for i, img := range images {
+tags[i] = img.Tag
+}
+require.Contains(t, tags, "v0.9.0", "Should retain active tag v0.9.0 for strategy %s", strategy)
+require.Contains(t, tags, "v1.0.0")
+})
+}
+}

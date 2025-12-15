@@ -90,6 +90,15 @@ fields:
     encountering rate limits -- decreasing this limit may improve performance.
     :::
 
+    :::info
+    Regardless of the `discoveryLimit` setting, Kargo automatically retains
+    image tags that are referenced by active Freight (Freight currently in use
+    by any Stage). This ensures that even if an older tag falls outside the
+    discovery window, it will remain available for Freight assembly as long as
+    it's actively deployed. This prevents situations where a running version
+    becomes unavailable for rollback or re-deployment.
+    :::
+
 - `insecureSkipTLSVerify`: Set to `true` to disable validation of the
   repository's TLS certificate.
 
@@ -207,16 +216,6 @@ strategies are:
     `allowTags` field to limit the number of tags for which metadata is
     retrieved to reduce the risk of encountering rate limits. `allowTags` may
     require periodic adjustment as a repository grows.
-    :::
-
-    :::info
-    To ensure continuity when using `NewestBuild`, Kargo automatically retains
-    image tags that are referenced by active Freight (Freight currently in use
-    by any Stage) during discovery. This means that even if an older tag falls
-    outside the discovery window (determined by `discoveryLimit`), it will
-    remain available for Freight assembly as long as it's actively deployed.
-    This prevents situations where a running version becomes unavailable for
-    rollback or re-deployment.
     :::
 
     ```yaml
