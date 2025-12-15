@@ -173,3 +173,37 @@ func ListFreightByCurrentStage(
 	}
 	return freightList.Items, nil
 }
+
+// ListActiveFreightByWarehouse returns a list of Freight resources that
+// originated from the specified Warehouse and are currently in use by any Stage.
+// "Active" Freight is defined as Freight with a non-empty Status.CurrentlyIn map.
+func ListActiveFreightByWarehouse(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	warehouseName string,
+) ([]kargoapi.Freight, error) {
+	freightList := kargoapi.FreightList{}
+	if err := c.List(
+		ctx,
+		&freightList,
+		client.InNamespace(namespace),
+		client.MatchingFields{"warehouse": warehouseName},
+	); err != nil {
+		return nil, fmt.Errorf(
+			"error listing Freight in namespace %q with warehouse %q: %w",
+			namespace,
+			warehouseName,
+			err,
+		)
+	}
+
+	// Filter to only include Freight that is currently in use by at least one Stage.
+	var activeFreight []kargoapi.Freight
+	for _, f := range freightList.Items {
+		if len(f.Status.CurrentlyIn) > 0 {
+			activeFreight = append(activeFreight, f)
+		}
+	}
+	return activeFreight, nil
+}
