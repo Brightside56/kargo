@@ -602,6 +602,14 @@ type DiscoveredImageReference struct {
 	// CreatedAt is the time the image was created. This field is optional, and
 	// not populated for every ImageSelectionStrategy.
 	CreatedAt *metav1.Time `json:"createdAt,omitempty" protobuf:"bytes,4,opt,name=createdAt"`
+	// RetainedFromActiveFreight indicates whether this tag was retained from
+	// active Freight rather than discovered through normal registry queries.
+	// This allows the controller to reuse retained tags on subsequent
+	// reconciliations without repeatedly querying the Kubernetes API for
+	// active Freight.
+	//
+	// +optional
+	RetainedFromActiveFreight bool `json:"retainedFromActiveFreight,omitempty" protobuf:"varint,6,opt,name=retainedFromActiveFreight"`
 }
 
 // ChartDiscoveryResult represents the result of a chart discovery operation for

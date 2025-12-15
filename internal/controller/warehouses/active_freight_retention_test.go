@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kargoapi "github.com/akuity/kargo/api/v1alpha1"
+	"github.com/akuity/kargo/internal/api"
 	"github.com/akuity/kargo/internal/credentials"
 	"github.com/akuity/kargo/internal/image"
 	"github.com/akuity/kargo/internal/indexer"
@@ -431,13 +432,24 @@ func TestRetainActiveFreightTags(t *testing.T) {
 				credentialsDB: &credentials.FakeDB{},
 			}
 
-			images, err := r.retainActiveFreightTags(
-				context.Background(),
-				tc.warehouse,
-				tc.subscription,
-				tc.selector,
-				tc.discoveredImages,
-			)
+// Query active Freight once (simulating what discoverImages does in fresh mode)
+activeFreight, err := api.ListActiveFreightByWarehouse(
+context.Background(),
+fakeClient,
+tc.warehouse.Namespace,
+tc.warehouse.Name,
+)
+require.NoError(t, err)
+
+// Test in fresh discovery mode (with activeFreight, no previous discovery)
+images, err := r.retainActiveFreightTags(
+context.Background(),
+tc.subscription,
+tc.selector,
+tc.discoveredImages,
+activeFreight,
+nil, // No previous discovery
+)
 
 			tc.assertions(t, images, err)
 		})
@@ -515,12 +527,23 @@ client:        fakeClient,
 credentialsDB: &credentials.FakeDB{},
 }
 
+// Query active Freight once (simulating what discoverImages does in fresh mode)
+activeFreight, err := api.ListActiveFreightByWarehouse(
+context.Background(),
+fakeClient,
+warehouse.Namespace,
+warehouse.Name,
+)
+require.NoError(t, err)
+
+// Test in fresh discovery mode (with activeFreight, no previous discovery)
 images, err := r.retainActiveFreightTags(
 context.Background(),
-warehouse,
 subscription,
 selector,
 discoveredImages,
+activeFreight,
+nil, // No previous discovery
 )
 
 require.NoError(t, err)
