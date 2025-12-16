@@ -441,14 +441,13 @@ tc.warehouse.Name,
 )
 require.NoError(t, err)
 
-// Test in fresh discovery mode (with activeFreight, no previous discovery)
+// Test with active Freight
 images, err := r.retainActiveFreightTags(
 context.Background(),
 tc.subscription,
 tc.selector,
 tc.discoveredImages,
 activeFreight,
-nil, // No previous discovery
 )
 
 			tc.assertions(t, images, err)
@@ -536,14 +535,13 @@ warehouse.Name,
 )
 require.NoError(t, err)
 
-// Test in fresh discovery mode (with activeFreight, no previous discovery)
+// Test with active Freight
 images, err := r.retainActiveFreightTags(
 context.Background(),
 subscription,
 selector,
 discoveredImages,
 activeFreight,
-nil, // No previous discovery
 )
 
 require.NoError(t, err)

@@ -13,88 +13,54 @@ import (
 
 // retainActiveFreightTags adds tags from active Freight to discovered images.
 // Active Freight = currently deployed (Status.CurrentlyIn non-empty).
-//
-// Modes: fresh (queries API, marks tags) vs cached (reuses previous tags).
 func (r *reconciler) retainActiveFreightTags(
 	ctx context.Context,
 	sub kargoapi.ImageSubscription,
 	selector image.Selector,
 	discoveredImages []kargoapi.DiscoveredImageReference,
 	activeFreight []kargoapi.Freight,
-	previousDiscovery []kargoapi.DiscoveredImageReference,
 ) ([]kargoapi.DiscoveredImageReference, error) {
+	if len(activeFreight) == 0 {
+		return discoveredImages, nil
+	}
+
 	logger := logging.LoggerFromContext(ctx).WithValues("repo", sub.RepoURL)
 
 	// Build a map of already-discovered tags for deduplication
-	discoveredTags := make(map[string]kargoapi.DiscoveredImageReference)
+	discoveredTags := make(map[string]struct{})
 	for _, img := range discoveredImages {
-		discoveredTags[img.Tag] = img
+		discoveredTags[img.Tag] = struct{}{}
 	}
 
-	var activeTags map[string]bool
+	// Extract unique tags from active Freight for this image repository
+	activeTags := make(map[string]bool)
+	for _, freight := range activeFreight {
+		for _, img := range freight.Images {
+			if img.RepoURL == sub.RepoURL && img.Tag != "" && selector.MatchesTag(img.Tag) {
+				activeTags[img.Tag] = true
+			}
+		}
+	}
+
+	if len(activeTags) == 0 {
+		return discoveredImages, nil
+	}
+
+	// Add active tags that aren't already in the discovered set
 	var addedCount int
-
-	// Mode 1: Fresh discovery from active Freight (when activeFreight is provided)
-	if activeFreight != nil {
-		logger.Trace("querying active tags from Freight", "freightCount", len(activeFreight))
-
-		// Extract unique tags from active Freight for this image repository
-		activeTags = make(map[string]bool)
-		for _, freight := range activeFreight {
-			for _, img := range freight.Images {
-				if img.RepoURL == sub.RepoURL && img.Tag != "" {
-					// Only include tags that match the selector criteria
-					if selector.MatchesTag(img.Tag) {
-						activeTags[img.Tag] = true
-					}
-				}
-			}
-		}
-
-		if len(activeTags) == 0 {
-			logger.Trace("no active tags found in Freight")
-			return discoveredImages, nil
-		}
-
-		logger.Trace("found active tags from Freight", "count", len(activeTags))
-
-		// Add active tags that aren't already in the discovered set
-		for tag := range activeTags {
-			if _, exists := discoveredTags[tag]; !exists {
-				discoveredImages = append(discoveredImages, kargoapi.DiscoveredImageReference{
-					Tag:               tag,
-					FromActiveFreight: true,
-					// Digest/CreatedAt omitted to avoid registry lookups
-				})
-				addedCount++
-			}
-		}
-	} else {
-		// Mode 2: Reuse cached retained tags from previous discovery
-		logger.Trace("reusing cached retained tags from previous discovery")
-
-		for _, prevImg := range previousDiscovery {
-			if prevImg.FromActiveFreight && selector.MatchesTag(prevImg.Tag) {
-				if _, exists := discoveredTags[prevImg.Tag]; !exists {
-					discoveredImages = append(discoveredImages, kargoapi.DiscoveredImageReference{
-						Tag:               prevImg.Tag,
-						FromActiveFreight: true,
-						Digest:            prevImg.Digest,
-						CreatedAt:         prevImg.CreatedAt,
-						Annotations:       prevImg.Annotations,
-					})
-					addedCount++
-				}
-			}
+	for tag := range activeTags {
+		if _, exists := discoveredTags[tag]; !exists {
+			discoveredImages = append(discoveredImages, kargoapi.DiscoveredImageReference{
+				Tag:               tag,
+				FromActiveFreight: true,
+				// Digest/CreatedAt omitted to avoid registry lookups
+			})
+			addedCount++
 		}
 	}
 
 	if addedCount > 0 {
-		logger.Debug(
-			"retained active Freight tags",
-			"added", addedCount,
-			"total", len(discoveredImages),
-		)
+		logger.Debug("retained active Freight tags", "added", addedCount, "total", len(discoveredImages))
 	}
 
 	return discoveredImages, nil
@@ -175,19 +141,8 @@ func (r *reconciler) discoverImages(
 			)
 		}
 
-		// Get previous discovery for cache reuse
-		var previousDiscovery []kargoapi.DiscoveredImageReference
-		if warehouse.Status.DiscoveredArtifacts != nil {
-			for _, prevResult := range warehouse.Status.DiscoveredArtifacts.Images {
-				if prevResult.RepoURL == sub.RepoURL {
-					previousDiscovery = prevResult.References
-					break
-				}
-			}
-		}
-
-		// Retain active Freight tags (cached mode if activeFreight is nil)
-		images, err = r.retainActiveFreightTags(ctx, sub, selector, images, activeFreight, previousDiscovery)
+		// Retain active Freight tags
+		images, err = r.retainActiveFreightTags(ctx, sub, selector, images, activeFreight)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"error retaining active Freight tags for image %q: %w",
