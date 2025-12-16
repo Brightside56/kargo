@@ -90,6 +90,12 @@ fields:
     encountering rate limits -- decreasing this limit may improve performance.
     :::
 
+    :::info
+    Tags from active Freight (currently deployed) are automatically retained
+    even if outside the discovery window, ensuring rollback availability.
+    Cached in Warehouse status, refreshed on spec changes or warehouse refresh.
+    :::
+
 - `insecureSkipTLSVerify`: Set to `true` to disable validation of the
   repository's TLS certificate.
 

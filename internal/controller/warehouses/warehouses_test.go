@@ -534,7 +534,7 @@ func TestDiscoverArtifacts(t *testing.T) {
 					return []kargoapi.GitDiscoveryResult{}, nil
 				},
 				discoverImagesFn: func(
-					context.Context, string,
+					context.Context, *kargoapi.Warehouse,
 					[]kargoapi.RepoSubscription,
 				) ([]kargoapi.ImageDiscoveryResult, error) {
 					return nil, errors.New("something went wrong")
@@ -556,7 +556,7 @@ func TestDiscoverArtifacts(t *testing.T) {
 					return []kargoapi.GitDiscoveryResult{}, nil
 				},
 				discoverImagesFn: func(
-					context.Context, string,
+					context.Context, *kargoapi.Warehouse,
 					[]kargoapi.RepoSubscription,
 				) ([]kargoapi.ImageDiscoveryResult, error) {
 					return []kargoapi.ImageDiscoveryResult{}, nil
@@ -588,7 +588,7 @@ func TestDiscoverArtifacts(t *testing.T) {
 					}, nil
 				},
 				discoverImagesFn: func(
-					context.Context, string,
+					context.Context, *kargoapi.Warehouse,
 					[]kargoapi.RepoSubscription,
 				) ([]kargoapi.ImageDiscoveryResult, error) {
 					return []kargoapi.ImageDiscoveryResult{
@@ -1095,7 +1095,7 @@ func TestReconcile(t *testing.T) {
 					},
 					discoverImagesFn: func(
 						context.Context,
-						string,
+						*kargoapi.Warehouse,
 						[]kargoapi.RepoSubscription,
 					) ([]kargoapi.ImageDiscoveryResult, error) {
 						return []kargoapi.ImageDiscoveryResult{}, nil

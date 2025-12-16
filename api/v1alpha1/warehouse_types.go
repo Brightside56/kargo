@@ -602,6 +602,11 @@ type DiscoveredImageReference struct {
 	// CreatedAt is the time the image was created. This field is optional, and
 	// not populated for every ImageSelectionStrategy.
 	CreatedAt *metav1.Time `json:"createdAt,omitempty" protobuf:"bytes,4,opt,name=createdAt"`
+	// FromActiveFreight indicates this tag came from active Freight rather
+	// than registry discovery, enabling CR-based caching.
+	//
+	// +optional
+	FromActiveFreight bool `json:"fromActiveFreight,omitempty" protobuf:"varint,6,opt,name=fromActiveFreight"`
 }
 
 // ChartDiscoveryResult represents the result of a chart discovery operation for

@@ -50,7 +50,7 @@ type reconciler struct {
 
 	discoverCommitsFn func(context.Context, string, []kargoapi.RepoSubscription) ([]kargoapi.GitDiscoveryResult, error)
 
-	discoverImagesFn func(context.Context, string, []kargoapi.RepoSubscription) ([]kargoapi.ImageDiscoveryResult, error)
+	discoverImagesFn func(context.Context, *kargoapi.Warehouse, []kargoapi.RepoSubscription) ([]kargoapi.ImageDiscoveryResult, error)
 
 	discoverChartsFn func(context.Context, string, []kargoapi.RepoSubscription) ([]kargoapi.ChartDiscoveryResult, error)
 
@@ -392,7 +392,7 @@ func (r *reconciler) discoverArtifacts(
 		return nil, fmt.Errorf("error discovering commits: %w", err)
 	}
 
-	images, err := r.discoverImagesFn(ctx, warehouse.Namespace, warehouse.Spec.Subscriptions)
+	images, err := r.discoverImagesFn(ctx, warehouse, warehouse.Spec.Subscriptions)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering images: %w", err)
 	}
