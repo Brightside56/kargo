@@ -93,7 +93,7 @@ fields:
     :::info
     Tags from active Freight (currently deployed) are automatically retained
     even if outside the discovery window, ensuring rollback availability.
-    Cached in Warehouse status, refreshed on spec changes or every 5 minutes.
+    Cached in Warehouse status, refreshed on spec changes or warehouse refresh.
     :::
 
 - `insecureSkipTLSVerify`: Set to `true` to disable validation of the

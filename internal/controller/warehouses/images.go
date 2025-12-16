@@ -3,7 +3,6 @@ package warehouses
 import (
 	"context"
 	"fmt"
-	"time"
 
 	kargoapi "github.com/akuity/kargo/api/v1alpha1"
 	"github.com/akuity/kargo/internal/api"
@@ -111,12 +110,10 @@ func (r *reconciler) discoverImages(
 ) ([]kargoapi.ImageDiscoveryResult, error) {
 	results := make([]kargoapi.ImageDiscoveryResult, 0, len(subs))
 
-	// Query active Freight on: first discovery, spec change, or periodic refresh
-	// (5 min since last discovery to catch Freight becoming inactive)
-	const activeFreightRefreshInterval = 5 * time.Minute
+	// Query active Freight only when warehouse would do full discovery refresh
+	// (aligns with shouldDiscoverArtifacts logic: first time, spec change, or interval elapsed)
 	needsFreshActiveFreight := warehouse.Status.DiscoveredArtifacts == nil ||
-		warehouse.Status.ObservedGeneration != warehouse.Generation ||
-		time.Since(warehouse.Status.DiscoveredArtifacts.DiscoveredAt.Time) > activeFreightRefreshInterval
+		warehouse.Status.ObservedGeneration != warehouse.Generation
 
 	var activeFreight []kargoapi.Freight
 	var err error
