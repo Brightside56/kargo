@@ -91,16 +91,9 @@ fields:
     :::
 
     :::info
-    Regardless of the `discoveryLimit` setting, Kargo automatically retains
-    image tags that are referenced by active Freight (Freight currently in use
-    by any Stage). This ensures that even if an older tag falls outside the
-    discovery window, it will remain available for Freight assembly as long as
-    it's actively deployed. This prevents situations where a running version
-    becomes unavailable for rollback or re-deployment.
-
-    Retained tags are cached in the Warehouse's status, minimizing Kubernetes
-    API queries. The cache is refreshed only when the Warehouse specification
-    changes or during the first discovery.
+    Tags from active Freight (currently deployed) are automatically retained
+    even if outside the discovery window, ensuring rollback availability.
+    Cached in Warehouse status, refreshed on spec changes or every 5 minutes.
     :::
 
 - `insecureSkipTLSVerify`: Set to `true` to disable validation of the

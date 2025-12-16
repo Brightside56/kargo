@@ -3,6 +3,7 @@ package warehouses
 import (
 	"context"
 	"fmt"
+	"time"
 
 	kargoapi "github.com/akuity/kargo/api/v1alpha1"
 	"github.com/akuity/kargo/internal/api"
@@ -11,19 +12,10 @@ import (
 	"github.com/akuity/kargo/internal/logging"
 )
 
-// retainActiveFreightTags augments the discovered images with tags from active
-// Freight to ensure they remain selectable even if they fall outside the
-// discovery window. Active Freight is defined as Freight that is currently in
-// use by at least one Stage (Status.CurrentlyIn is non-empty).
+// retainActiveFreightTags adds tags from active Freight to discovered images.
+// Active Freight = currently deployed (Status.CurrentlyIn non-empty).
 //
-// This function supports two modes:
-// 1. Fresh discovery: when activeFreight is provided (non-nil), it queries active tags
-//    from the Freight and marks them as retained in the output.
-// 2. Cached mode: when activeFreight is nil, it reuses previously retained tags from
-//    previousDiscovery to avoid Kubernetes API calls.
-//
-// The retained tags are stored in the Warehouse CR status and reused across
-// reconciliations until a fresh discovery is triggered.
+// Modes: fresh (queries API, marks tags) vs cached (reuses previous tags).
 func (r *reconciler) retainActiveFreightTags(
 	ctx context.Context,
 	sub kargoapi.ImageSubscription,
@@ -71,10 +63,9 @@ func (r *reconciler) retainActiveFreightTags(
 		for tag := range activeTags {
 			if _, exists := discoveredTags[tag]; !exists {
 				discoveredImages = append(discoveredImages, kargoapi.DiscoveredImageReference{
-					Tag:                       tag,
-					RetainedFromActiveFreight: true,
-					// Digest and CreatedAt are intentionally left empty as we're not
-					// fetching full metadata to avoid performance issues
+					Tag:               tag,
+					FromActiveFreight: true,
+					// Digest/CreatedAt omitted to avoid registry lookups
 				})
 				addedCount++
 			}
@@ -84,15 +75,14 @@ func (r *reconciler) retainActiveFreightTags(
 		logger.Trace("reusing cached retained tags from previous discovery")
 
 		for _, prevImg := range previousDiscovery {
-			// Only reuse tags that were marked as retained and still match selector
-			if prevImg.RetainedFromActiveFreight && selector.MatchesTag(prevImg.Tag) {
+			if prevImg.FromActiveFreight && selector.MatchesTag(prevImg.Tag) {
 				if _, exists := discoveredTags[prevImg.Tag]; !exists {
 					discoveredImages = append(discoveredImages, kargoapi.DiscoveredImageReference{
-						Tag:                       prevImg.Tag,
-						RetainedFromActiveFreight: true,
-						Digest:                    prevImg.Digest,
-						CreatedAt:                 prevImg.CreatedAt,
-						Annotations:               prevImg.Annotations,
+						Tag:               prevImg.Tag,
+						FromActiveFreight: true,
+						Digest:            prevImg.Digest,
+						CreatedAt:         prevImg.CreatedAt,
+						Annotations:       prevImg.Annotations,
 					})
 					addedCount++
 				}
@@ -111,20 +101,9 @@ func (r *reconciler) retainActiveFreightTags(
 	return discoveredImages, nil
 }
 
-// discoverImages discovers the latest suitable images for the given image
-// subscriptions. It returns a list of image discovery results, one for each
-// subscription.
-//
-// This function includes image tags referenced by "active" Freight (Freight
-// currently in use by any Stage) to ensure older tags that have fallen outside
-// the discovery window remain selectable. This applies to all image selection
-// strategies to prevent situations where an actively deployed version becomes
-// unavailable for rollback or re-deployment.
-//
-// To minimize Kubernetes API calls, this function leverages cached information
-// from the previous reconciliation stored in the Warehouse CR's status. It only
-// queries active Freight from the API when fresh discovery is triggered or when
-// no cached data exists.
+// discoverImages discovers images for subscriptions, retaining tags from
+// active Freight to ensure deployed versions remain available for rollback.
+// Uses CR-based caching to minimize K8s API calls.
 func (r *reconciler) discoverImages(
 	ctx context.Context,
 	warehouse *kargoapi.Warehouse,
@@ -132,18 +111,16 @@ func (r *reconciler) discoverImages(
 ) ([]kargoapi.ImageDiscoveryResult, error) {
 	results := make([]kargoapi.ImageDiscoveryResult, 0, len(subs))
 
-	// Determine if we need to query active Freight from the API. We do this when:
-	// 1. This is a fresh discovery (no previous discovered artifacts)
-	// 2. The warehouse spec changed (observed generation differs)
+	// Query active Freight on: first discovery, spec change, or periodic refresh
+	// (5 min since last discovery to catch Freight becoming inactive)
+	const activeFreightRefreshInterval = 5 * time.Minute
 	needsFreshActiveFreight := warehouse.Status.DiscoveredArtifacts == nil ||
-		warehouse.Status.ObservedGeneration != warehouse.Generation
+		warehouse.Status.ObservedGeneration != warehouse.Generation ||
+		time.Since(warehouse.Status.DiscoveredArtifacts.DiscoveredAt.Time) > activeFreightRefreshInterval
 
 	var activeFreight []kargoapi.Freight
 	var err error
 
-	// Only query the API if we need fresh data. Otherwise, we'll reuse the
-	// retained tags from the previous reconciliation that are already cached
-	// in the Warehouse CR status.
 	if needsFreshActiveFreight {
 		activeFreight, err = api.ListActiveFreightByWarehouse(
 			ctx,
@@ -201,7 +178,7 @@ func (r *reconciler) discoverImages(
 			)
 		}
 
-		// Find previous discovery results for this repo URL to reuse cached retained tags
+		// Get previous discovery for cache reuse
 		var previousDiscovery []kargoapi.DiscoveredImageReference
 		if warehouse.Status.DiscoveredArtifacts != nil {
 			for _, prevResult := range warehouse.Status.DiscoveredArtifacts.Images {
@@ -212,13 +189,7 @@ func (r *reconciler) discoverImages(
 			}
 		}
 
-		// Augment the discovered images with tags from active Freight to ensure
-		// they remain selectable even if they fall outside the discovery window.
-		// This applies to all strategies to prevent situations where an actively
-		// deployed version becomes unavailable for rollback or re-deployment.
-		//
-		// If activeFreight is nil (cached mode), the function will reuse retained
-		// tags from previousDiscovery without querying the Kubernetes API.
+		// Retain active Freight tags (cached mode if activeFreight is nil)
 		images, err = r.retainActiveFreightTags(ctx, sub, selector, images, activeFreight, previousDiscovery)
 		if err != nil {
 			return nil, fmt.Errorf(
